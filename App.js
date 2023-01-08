@@ -26,6 +26,9 @@ import {
   updateDoc,
   arrayUnion,
   getDoc,
+  query,
+  where,
+  onSnapshot,
 } from "firebase/firestore";
 
 import {
@@ -41,10 +44,11 @@ import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityI
 import SelectDropdown from "react-native-select-dropdown";
 
 import AgendaItem from "./AgendaItem";
-import { Provider } from "mobx-react";
-
+import { Provider, Observer } from "mobx-react";
+import _ from "lodash";
 import store from "./store";
 import useStore from "./store/UseStore";
+import { autorun } from "mobx";
 
 const Stack = createNativeStackNavigator();
 const Tab = createMaterialBottomTabNavigator();
@@ -77,7 +81,7 @@ const CreateScreen = () => {
     return () => unsubscribe();
   }, [isFocused]);
 
-  const setData = async (collectionId, date, content, setCount, loopCount) => {
+  const setData = async ({ collectionId, date, text, setCount, loopCount }) => {
     if (!collectionId || !date) {
       return console.error(
         "CreateScreen: setData(): collectionId or date is null"
@@ -86,29 +90,21 @@ const CreateScreen = () => {
 
     const db = getFirestore(app);
 
-    const currentFirestoreRef = doc(db, collectionId, date);
-    const docSnap = await getDoc(currentFirestoreRef);
-
-    if (docSnap.exists()) {
-      await updateDoc(currentFirestoreRef, {
-        data: arrayUnion(content),
+    try {
+      await addDoc(collection(db, collectionId), {
+        text,
+        setCount,
+        loopCount,
+        date,
+        uid,
       });
-    } else {
-      try {
-        try {
-          await setDoc(doc(db, collectionId, date), {
-            data: [{ content, setCount, loopCount }],
-          });
-        } catch (err) {
-          console.error(err);
-        }
-      } catch (err) {
-        console.error(err);
-      }
+    } catch (err) {
+      console.error(err);
     }
+    // }
   };
 
-  const createEvent = async ({ text, setCount, loopCount }) => {
+  const createEvent = async ({ text, setCount, loopCount, date }) => {
     if (!text) {
       return Alert.alert("알림", "내용을 입력해주세요!");
     }
@@ -120,12 +116,21 @@ const CreateScreen = () => {
       return Alert.alert("알림", "반복 수를 입력해주세요!");
     }
 
-    await getData(uid, convertDate(date));
+    // await getData(uid, convertDate(date));
 
-    console.log("uid: " + uid);
-    console.log("date: " + convertDate(date));
+    await setData({
+      collectionId: "agendas",
+      uid,
+      date: convertDate(date),
+      text,
+      setCount,
+      loopCount,
+    });
 
-    await setData(uid, convertDate(date), text, setCount, loopCount);
+    Alert.alert(
+      "알림",
+      `${convertDate(date)}, "${text}"에 대한 일정이 추가되었습니다!`
+    );
   };
 
   const getData = async (uid, date) => {
@@ -233,12 +238,7 @@ const CreateScreen = () => {
       <Pressable
         disabled={!text.length}
         onPress={async () => {
-          await createEvent({ text, setCount, loopCount });
-
-          Alert.alert(
-            "알림",
-            `${convertDate(date)}, "${text}"에 대한 일정이 추가되었습니다!`
-          );
+          await createEvent({ text, setCount, loopCount, date });
 
           setText("");
         }}
@@ -285,49 +285,57 @@ const HomeScreen = () => {
     return () => unsubscribe();
   }, [isFocused]);
 
+  useEffect(() => {
+    const q = query(collection(db, "agendas"), where("uid", "==", uid));
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const agendas = [];
+
+      querySnapshot.forEach((doc) => {
+        agendas.push({ ...doc.data(), id: doc.id });
+      });
+
+      setFinal(_.groupBy(agendas, "date"));
+    });
+
+    return () => unsubscribe();
+  }, [uid]);
+
+  useEffect(() => {
+    console.log("-".repeat(30));
+    console.log(final);
+  }, [final]);
+
   const getData = async (uid) => {
     const tempObj = {};
-    const tempArr = [];
-
-    console.log("getData() is called");
-    console.log("route?.params?.uid: " + route?.params?.uid);
 
     if (route?.params?.uid) {
-      const querySnapshot = await getDocs(collection(db, route?.params?.uid));
+      const tempArray = [];
+
+      const agendasRef = collection(db, "agendas");
+      const q = query(agendasRef, where("uid", "==", uid));
+      const querySnapshot = await getDocs(q);
 
       querySnapshot.forEach((doc) => {
-        Object.assign(tempObj, { [doc.id]: doc.data().data });
-
-        console.log(`${doc.id} => `);
-        console.log(doc.data());
+        const { date, loopCount, setCount, text, uid } = doc.data();
+        tempArray.push({ ...doc.data(), id: doc.id });
       });
 
-      querySnapshot.forEach((doc) => {
-        tempArr.push(doc);
-      });
-
-      setFinal(tempObj);
-
-      console.log(userStore);
-      userStore.setMyArray(tempArr);
+      setFinal(_.groupBy(tempArray, "date"));
     } else {
       if (uid) {
         const tempArray = [];
 
-        const querySnapshot = await getDocs(collection(db, uid));
+        const agendasRef = collection(db, "agendas");
+        const q = query(agendasRef, where("uid", "==", uid));
+        const querySnapshot = await getDocs(q);
 
         querySnapshot.forEach((doc) => {
-          Object.assign(tempObj, { [doc.id]: doc.data().data });
-
-          // console.log(`${doc.id} => `);
-          // console.log(doc.data());
+          const { date, loopCount, setCount, text, uid } = doc.data();
+          tempArray.push({ ...doc.data(), id: doc.id });
         });
 
-        console.log("-".repeat(20));
-        console.log(tempArray);
-
-        setFinal(tempObj);
-        userStore.setMyObject(tempObj);
+        setFinal(_.groupBy(tempArray, "date"));
       } else {
         console.log("In the HomeScreen");
         console.log("No uid");
@@ -355,30 +363,39 @@ const HomeScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="auto" />
+    <Observer>
+      {() => (
+        <SafeAreaView style={styles.container}>
+          <StatusBar style="auto" />
 
-      <Agenda
-        selected={getToday()}
-        items={final}
-        renderItem={(item, isFirst) => <AgendaItem item={item} />}
-        renderEmptyData={() => {
-          return (
-            <>
-              <View style={{ height: 225 }} />
-              <View style={{ justifyContent: "center", alignItems: "center" }}>
-                <Text style={{ fontSize: 24, fontWeight: "700" }}>
-                  운동일정이 없어요!
-                </Text>
-              </View>
-            </>
-          );
-        }}
-        onDayPress={(day) => {
-          console.log("day changed", day);
-        }}
-      />
-    </SafeAreaView>
+          <Agenda
+            selected={getToday()}
+            items={final}
+            rowHasChanged={(r1, r2) => {
+              return true;
+            }}
+            renderItem={(item, isFirst) => <AgendaItem item={item} />}
+            renderEmptyData={() => {
+              return (
+                <>
+                  <View style={{ height: 225 }} />
+                  <View
+                    style={{ justifyContent: "center", alignItems: "center" }}
+                  >
+                    <Text style={{ fontSize: 24, fontWeight: "700" }}>
+                      운동일정이 없어요!
+                    </Text>
+                  </View>
+                </>
+              );
+            }}
+            onDayPress={(day) => {
+              console.log("day changed", day);
+            }}
+          />
+        </SafeAreaView>
+      )}
+    </Observer>
   );
 };
 

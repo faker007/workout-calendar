@@ -6,9 +6,20 @@ export default function AgendaItem({ item }) {
 
   return (
     <View style={styles.item}>
-      <Text style={styles.itemText}>{item?.content?.toString()}</Text>
-      {/* TODO: CreateCheckbox  */}
+      <Text
+        style={[
+          styles.itemText,
+          {
+            textDecorationLine: !item?.isChecked?.length
+              ? undefined
+              : "line-through",
+          },
+        ]}
+      >
+        {item?.text?.toString()}
+      </Text>
 
+      {/* Spacer */}
       <View style={{ width: 25 }} />
 
       {setCount.map((element, index) => (
