@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, createContext } from "react";
 import {
   StyleSheet,
   Text,
@@ -36,10 +36,15 @@ import {
 } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createMaterialBottomTabNavigator } from "@react-navigation/material-bottom-tabs";
-
 import DateTimePicker from "@react-native-community/datetimepicker";
-
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
+import SelectDropdown from "react-native-select-dropdown";
+
+import AgendaItem from "./AgendaItem";
+import { Provider } from "mobx-react";
+
+import store from "./store";
+import useStore from "./store/UseStore";
 
 const Stack = createNativeStackNavigator();
 const Tab = createMaterialBottomTabNavigator();
@@ -52,14 +57,18 @@ const CreateScreen = () => {
   const [show, setShow] = useState(true);
   const [text, setText] = useState("");
   const [uid, setUid] = useState("");
+  const [setCount, setSetCount] = useState(0);
+  const [loopCount, setLoopCount] = useState(0);
+
+  const data = [
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
+    22, 23, 24, 25, 26, 27, 28, 29, 30,
+  ];
 
   useEffect(() => {
     const auth = getAuth(app);
 
     const unsubscribe = auth.onAuthStateChanged((user) => {
-      // console.log(JSON.stringify(user, null, 2));
-      console.log(user.email);
-
       if (user?.uid) {
         setUid(user?.email);
       }
@@ -68,7 +77,7 @@ const CreateScreen = () => {
     return () => unsubscribe();
   }, [isFocused]);
 
-  const setData = async (collectionId, date, content) => {
+  const setData = async (collectionId, date, content, setCount, loopCount) => {
     if (!collectionId || !date) {
       return console.error(
         "CreateScreen: setData(): collectionId or date is null"
@@ -84,23 +93,31 @@ const CreateScreen = () => {
       await updateDoc(currentFirestoreRef, {
         data: arrayUnion(content),
       });
-
-      console.log("존재와 업데이트");
     } else {
       try {
-        await setDoc(doc(db, collectionId, date), {
-          data: [content],
-        });
-        console.log("존재하지 않음 수고링~");
+        try {
+          await setDoc(doc(db, collectionId, date), {
+            data: [{ content, setCount, loopCount }],
+          });
+        } catch (err) {
+          console.error(err);
+        }
       } catch (err) {
         console.error(err);
       }
     }
   };
 
-  const createEvent = async (content: string) => {
-    if (!content) {
+  const createEvent = async ({ text, setCount, loopCount }) => {
+    if (!text) {
       return Alert.alert("알림", "내용을 입력해주세요!");
+    }
+
+    if (!setCount) {
+      return Alert.alert("알림", "세트 수를 입력해주세요!");
+    }
+    if (!loopCount) {
+      return Alert.alert("알림", "반복 수를 입력해주세요!");
     }
 
     await getData(uid, convertDate(date));
@@ -108,20 +125,15 @@ const CreateScreen = () => {
     console.log("uid: " + uid);
     console.log("date: " + convertDate(date));
 
-    await setData(uid, convertDate(date), text);
+    await setData(uid, convertDate(date), text, setCount, loopCount);
   };
 
-  const getData = async (uid: string, date: string) => {
+  const getData = async (uid, date) => {
     const db = getFirestore(app);
 
     const querySnapshot = await getDocs(collection(db, uid));
 
     const currentSize = querySnapshot.size;
-
-    querySnapshot.forEach((doc) => {
-      console.log(`${doc.id} => `);
-      console.log(doc.data());
-    });
 
     if (!currentSize) {
       console.log("현재 없음");
@@ -189,10 +201,39 @@ const CreateScreen = () => {
 
       <View style={{ height: 40 }} />
 
+      <SelectDropdown
+        data={data}
+        onSelect={(selectedItem, index) => {
+          setSetCount(Number(selectedItem));
+          console.log(selectedItem, index);
+        }}
+        buttonTextAfterSelection={(selectedItem, index) => {
+          return selectedItem;
+        }}
+        rowTextForSelection={(item, index) => {
+          return item;
+        }}
+        defaultButtonText={"세트를 선택하세요"}
+      />
+
+      <SelectDropdown
+        data={data}
+        onSelect={(selectedItem, index) => {
+          setLoopCount(Number(selectedItem));
+        }}
+        buttonTextAfterSelection={(selectedItem, index) => {
+          return selectedItem;
+        }}
+        rowTextForSelection={(item, index) => {
+          return item;
+        }}
+        defaultButtonText={"횟수를 선택하세요"}
+      />
+
       <Pressable
         disabled={!text.length}
-        onPressIn={() => {
-          createEvent(text);
+        onPress={async () => {
+          await createEvent({ text, setCount, loopCount });
 
           Alert.alert(
             "알림",
@@ -212,7 +253,7 @@ const CreateScreen = () => {
           }}
         >
           <Text style={{ fontSize: 22, fontWeight: "700", color: "white" }}>
-            일정 만들기
+            운동 일정 만들기
           </Text>
         </View>
       </Pressable>
@@ -230,7 +271,7 @@ const HomeScreen = () => {
 
   const route = useRoute();
 
-  console.log("route?.params?.uid: " + route?.params?.uid);
+  const { userStore } = useStore();
 
   useEffect(() => {
     const auth = getAuth(app);
@@ -246,6 +287,10 @@ const HomeScreen = () => {
 
   const getData = async (uid) => {
     const tempObj = {};
+    const tempArr = [];
+
+    console.log("getData() is called");
+    console.log("route?.params?.uid: " + route?.params?.uid);
 
     if (route?.params?.uid) {
       const querySnapshot = await getDocs(collection(db, route?.params?.uid));
@@ -257,19 +302,32 @@ const HomeScreen = () => {
         console.log(doc.data());
       });
 
+      querySnapshot.forEach((doc) => {
+        tempArr.push(doc);
+      });
+
       setFinal(tempObj);
+
+      console.log(userStore);
+      userStore.setMyArray(tempArr);
     } else {
       if (uid) {
+        const tempArray = [];
+
         const querySnapshot = await getDocs(collection(db, uid));
 
         querySnapshot.forEach((doc) => {
           Object.assign(tempObj, { [doc.id]: doc.data().data });
 
-          console.log(`${doc.id} => `);
-          console.log(doc.data());
+          // console.log(`${doc.id} => `);
+          // console.log(doc.data());
         });
 
+        console.log("-".repeat(20));
+        console.log(tempArray);
+
         setFinal(tempObj);
+        userStore.setMyObject(tempObj);
       } else {
         console.log("In the HomeScreen");
         console.log("No uid");
@@ -279,7 +337,6 @@ const HomeScreen = () => {
 
   useEffect(() => {
     const inner = async () => {
-      console.log("Called uid: " + uid);
       await getData(uid);
     };
 
@@ -304,18 +361,14 @@ const HomeScreen = () => {
       <Agenda
         selected={getToday()}
         items={final}
-        renderItem={(item, isFirst) => (
-          <TouchableOpacity style={styles.item}>
-            <Text style={styles.itemText}>{item?.toString()}</Text>
-          </TouchableOpacity>
-        )}
+        renderItem={(item, isFirst) => <AgendaItem item={item} />}
         renderEmptyData={() => {
           return (
             <>
               <View style={{ height: 225 }} />
               <View style={{ justifyContent: "center", alignItems: "center" }}>
                 <Text style={{ fontSize: 24, fontWeight: "700" }}>
-                  일정이 없어요!
+                  운동일정이 없어요!
                 </Text>
               </View>
             </>
@@ -351,9 +404,7 @@ const BeforeSignUpScreen = () => {
 
   return (
     <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-      <Text style={{ fontSize: 32, fontWeight: "bold" }}>
-        터어엉! 회원가입 고오?
-      </Text>
+      <Text style={{ fontSize: 32, fontWeight: "bold" }}>Let's Workout</Text>
     </View>
   );
 };
@@ -365,15 +416,13 @@ const SignUpScreen = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = async (email, password) => {
     try {
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         email,
         password
       );
-
-      console.log(userCredential.user);
 
       navigation.navigate("Home");
     } catch (error) {
@@ -392,14 +441,14 @@ const SignUpScreen = () => {
 
   return (
     <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-      <Text style={{ fontSize: 28, fontWeight: "700", color: "lightblue" }}>
-        놀랍게도 회원가입!?
+      <Text style={{ fontSize: 28, fontWeight: "700", color: "lightgreen" }}>
+        Let's Workout 회원가입
       </Text>
       <View style={{ height: 40 }} />
 
       <TextInput
         style={{ height: 40, borderColor: "gray", borderWidth: 1, width: 300 }}
-        placeholder={"xyz@xyz.com"}
+        placeholder={"test@test.com"}
         onChange={(event) => {
           setEmail(event.nativeEvent.text);
         }}
@@ -410,7 +459,6 @@ const SignUpScreen = () => {
 
       <TextInput
         style={{ height: 40, borderColor: "gray", borderWidth: 1, width: 300 }}
-        placeholder={"패스워드는 여기로!"}
         secureTextEntry
         onChange={(event) => {
           setPassword(event.nativeEvent.text);
@@ -431,154 +479,13 @@ const SignUpScreen = () => {
             width: 300,
             height: 50,
             borderRadius: 20,
-            backgroundColor: email && password ? "lightblue" : "#666",
+            backgroundColor: email && password ? "lightgreen" : "#666",
             justifyContent: "center",
             alignItems: "center",
           }}
         >
           <Text style={{ color: "white", fontSize: 22, fontWeight: "700" }}>
-            회원가입 해보자!
-          </Text>
-        </View>
-      </Pressable>
-    </View>
-  );
-};
-
-const ShareScreen = () => {
-  const auth = getAuth(app);
-
-  const isFocused = useIsFocused();
-  const navigation = useNavigation();
-
-  const [uid, setUid] = useState("");
-  const [tempUid, setTempUid] = useState("");
-  const [typedUid, setTypeUid] = useState("");
-
-  useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      if (user?.uid) {
-        setTempUid(user?.email);
-      }
-    });
-
-    return () => unsubscribe();
-  }, [isFocused]);
-
-  const setRealUid = () => {
-    setUid(tempUid ?? "허허, 이메일이 없어! 큰일 났다!");
-  };
-
-  const viewBFCalendar = () => {
-    setRealUid("");
-    setTempUid("");
-    setTypeUid("");
-
-    if (!typedUid) {
-      return Alert.alert("알림", "이런! 짱친의 이메일을 입력하지 않았군!");
-    }
-
-    navigation.navigate("Home", { uid: typedUid });
-  };
-
-  return (
-    <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-      <Text style={{ fontSize: 28, fontWeight: "700", color: "lightblue" }}>
-        짱친과 일정을 공유하거나, 공유 받자!
-      </Text>
-      <View style={{ height: 40 }} />
-
-      <TextInput
-        style={{ height: 40, borderColor: "gray", borderWidth: 1, width: 300 }}
-        placeholder={
-          "아래의 버튼을 눌르면, 짱친에게 공유할 수 있는 이메일이 나와!"
-        }
-        autoCapitalize={"none"}
-        value={uid}
-      />
-
-      <View style={{ height: 20 }} />
-
-      <Pressable
-        onPressIn={() => {
-          setRealUid();
-        }}
-      >
-        <View
-          style={{
-            width: 300,
-            height: 50,
-            borderRadius: 20,
-            backgroundColor: "lightblue",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <Text style={{ color: "white", fontSize: 22, fontWeight: "700" }}>
-            나를 눌러, 이메일을 얻자!
-          </Text>
-        </View>
-      </Pressable>
-
-      <View style={{ height: 40 }} />
-
-      <TextInput
-        style={{ height: 40, borderColor: "gray", borderWidth: 1, width: 300 }}
-        placeholder={"짱친에게 공유 받는 이메일은 여기로~"}
-        autoCapitalize={"none"}
-        value={typedUid}
-        onChange={(event) => {
-          setTypeUid(event.nativeEvent.text);
-          console.log(typedUid);
-        }}
-      />
-
-      <View style={{ height: 40 }} />
-
-      <Pressable
-        onPressIn={() => {
-          viewBFCalendar();
-        }}
-      >
-        <View
-          style={{
-            width: 300,
-            height: 50,
-            borderRadius: 20,
-            backgroundColor: "lightblue",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <Text style={{ color: "white", fontSize: 22, fontWeight: "700" }}>
-            좋았어! 짱친의 일정을 보자!
-          </Text>
-        </View>
-      </Pressable>
-
-      <View style={{ height: 40 }} />
-
-      <Pressable
-        onPressIn={() => {
-          navigation.navigate("Home");
-
-          setRealUid("");
-          setTempUid("");
-          setTypeUid("");
-        }}
-      >
-        <View
-          style={{
-            width: 300,
-            height: 50,
-            borderRadius: 20,
-            backgroundColor: "lightblue",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <Text style={{ color: "white", fontSize: 22, fontWeight: "700" }}>
-            내 일정으로 돌아 가보자!
+            회원가입 하기
           </Text>
         </View>
       </Pressable>
@@ -588,21 +495,23 @@ const ShareScreen = () => {
 
 export default function App() {
   return (
-    <NavigationContainer>
-      <Stack.Navigator>
-        <Stack.Screen
-          name="BeforeSignUp"
-          component={BeforeSignUpScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="SignUp"
-          component={SignUpScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen name="Home" component={MyTabs} />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <Provider {...store}>
+      <NavigationContainer>
+        <Stack.Navigator>
+          <Stack.Screen
+            name="BeforeSignUp"
+            component={BeforeSignUpScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="SignUp"
+            component={SignUpScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen name="Home" component={MyTabs} />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </Provider>
   );
 }
 
@@ -691,7 +600,7 @@ function MyTabs() {
           ),
         }}
       />
-      <Tab.Screen
+      {/* <Tab.Screen
         name="Share"
         component={ShareScreen}
         options={{
@@ -699,7 +608,7 @@ function MyTabs() {
             <MaterialCommunityIcons name="home" color={color} size={26} />
           ),
         }}
-      />
+      /> */}
     </Tab.Navigator>
   );
 }
