@@ -44,11 +44,16 @@ import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityI
 import SelectDropdown from "react-native-select-dropdown";
 
 import AgendaItem from "./AgendaItem";
-import { Provider, Observer } from "mobx-react";
+
 import _ from "lodash";
+
+import { Provider, Observer } from "mobx-react";
 import store from "./store";
 import useStore from "./store/UseStore";
-import { autorun } from "mobx";
+
+/** Tab Screens */
+import TimerScreen from "./TimerScreen";
+import PedometerScreen from "./PedometerScreen";
 
 const Stack = createNativeStackNavigator();
 const Tab = createMaterialBottomTabNavigator();
@@ -116,8 +121,6 @@ const CreateScreen = () => {
       return Alert.alert("알림", "반복 수를 입력해주세요!");
     }
 
-    // await getData(uid, convertDate(date));
-
     await setData({
       collectionId: "agendas",
       uid,
@@ -153,8 +156,8 @@ const CreateScreen = () => {
     const month = date.getMonth() + 1;
     const day = date.getDate();
 
-    return `${year}-${month <= 10 ? "0" + month : month}-${
-      day <= 10 ? "0" + day : day
+    return `${year}-${month < 10 ? "0" + month : month}-${
+      day < 10 ? "0" + day : day
     }`;
   };
 
@@ -357,8 +360,8 @@ const HomeScreen = () => {
     const month = today.getMonth() + 1;
     const date = today.getDate();
 
-    return `${year}-${month <= 10 ? "0" + month : month}-${
-      date <= 10 ? "0" + date : date
+    return `${year}-${month < 10 ? "0" + month : month}-${
+      date < 10 ? "0" + date : date
     }`;
   };
 
@@ -525,7 +528,11 @@ export default function App() {
             component={SignUpScreen}
             options={{ headerShown: false }}
           />
-          <Stack.Screen name="Home" component={MyTabs} />
+          <Stack.Screen
+            name="Home"
+            component={MyTabs}
+            options={{ headerShown: false }}
+          />
         </Stack.Navigator>
       </NavigationContainer>
     </Provider>
@@ -585,6 +592,7 @@ function MyTabBar({ state, descriptors, navigation }) {
             </TouchableOpacity>
           );
         })}
+
         <View style={{ height: 50 }} />
       </View>
     </>
@@ -617,15 +625,28 @@ function MyTabs() {
           ),
         }}
       />
-      {/* <Tab.Screen
-        name="Share"
-        component={ShareScreen}
+      <Tab.Screen
+        name="Timer"
+        component={() => <TimerScreen />}
         options={{
           tabBarIcon: ({ color }) => (
-            <MaterialCommunityIcons name="home" color={color} size={26} />
+            <MaterialCommunityIcons name="timer" color={color} size={26} />
           ),
         }}
-      /> */}
+      />
+      <Tab.Screen
+        name="Pedometer"
+        component={() => <PedometerScreen />}
+        options={{
+          tabBarIcon: ({ color }) => (
+            <MaterialCommunityIcons
+              name="rotate-orbit"
+              color={color}
+              size={26}
+            />
+          ),
+        }}
+      />
     </Tab.Navigator>
   );
 }

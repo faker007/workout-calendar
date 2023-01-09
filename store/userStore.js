@@ -14,6 +14,10 @@ import { app } from "../firebaseConfig";
 
 export const userStore = makeAutoObservable({
   _forceUpdate: 0,
+  mSecs: 0,
+  setMsecs(time) {
+    this.mSecs = time;
+  },
   forceUpdate() {
     this._forceUpdate = Math.random();
   },
