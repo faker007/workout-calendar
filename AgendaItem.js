@@ -6,18 +6,40 @@ export default function AgendaItem({ item }) {
 
   return (
     <View style={styles.item}>
-      <Text
-        style={[
-          styles.itemText,
-          {
-            textDecorationLine: !item?.isChecked?.length
-              ? undefined
-              : "line-through",
-          },
-        ]}
-      >
-        {item?.text?.toString()}
-      </Text>
+      <View style={{ flexDirection: "column" }}>
+        <Text
+          style={[
+            styles.itemText,
+            {
+              textDecorationLine: !item?.isChecked?.length
+                ? undefined
+                : "line-through",
+            },
+          ]}
+        >
+          {item?.text?.toString()}
+        </Text>
+
+        <View style={{ flexDirection: "row", justifyContent: "center" }}>
+          <Text
+            style={[
+              styles.itemText,
+              {
+                textDecorationLine: !item?.isChecked?.length
+                  ? undefined
+                  : "line-through",
+                textAlign: "center",
+              },
+            ]}
+          >
+            {item?.weight?.toString()}
+          </Text>
+
+          <Text style={{ fontSize: 12, lineHeight: 18, color: "#666" }}>{`${
+            item?.weight ? "kg" : ""
+          }`}</Text>
+        </View>
+      </View>
 
       {/* Spacer */}
       <View style={{ width: 25 }} />

@@ -68,10 +68,15 @@ const CreateScreen = () => {
   const [uid, setUid] = useState("");
   const [setCount, setSetCount] = useState(0);
   const [loopCount, setLoopCount] = useState(0);
+  const [weight, setWeight] = useState(0);
 
   const data = [
     1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
     22, 23, 24, 25, 26, 27, 28, 29, 30,
+  ];
+  const data2 = [
+    5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95,
+    100,
   ];
 
   useEffect(() => {
@@ -86,7 +91,14 @@ const CreateScreen = () => {
     return () => unsubscribe();
   }, [isFocused]);
 
-  const setData = async ({ collectionId, date, text, setCount, loopCount }) => {
+  const setData = async ({
+    collectionId,
+    date,
+    text,
+    setCount,
+    loopCount,
+    weight,
+  }) => {
     if (!collectionId || !date) {
       return console.error(
         "CreateScreen: setData(): collectionId or date is null"
@@ -102,6 +114,7 @@ const CreateScreen = () => {
         loopCount,
         date,
         uid,
+        weight,
       });
     } catch (err) {
       console.error(err);
@@ -109,16 +122,21 @@ const CreateScreen = () => {
     // }
   };
 
-  const createEvent = async ({ text, setCount, loopCount, date }) => {
+  const createEvent = async ({ text, setCount, loopCount, date, weight }) => {
     if (!text) {
       return Alert.alert("알림", "내용을 입력해주세요!");
     }
 
     if (!setCount) {
-      return Alert.alert("알림", "세트 수를 입력해주세요!");
+      return Alert.alert("알림", "세트 수를 선택 해주세요!");
     }
+
     if (!loopCount) {
-      return Alert.alert("알림", "반복 수를 입력해주세요!");
+      return Alert.alert("알림", "반복 수를 선택 해주세요!");
+    }
+
+    if (!loopCount) {
+      return Alert.alert("알림", "무게를 선택 해주세요!");
     }
 
     await setData({
@@ -128,6 +146,7 @@ const CreateScreen = () => {
       text,
       setCount,
       loopCount,
+      weight,
     });
 
     Alert.alert(
@@ -178,7 +197,7 @@ const CreateScreen = () => {
 
   return (
     <View style={{ justifyContent: "center", alignItems: "center" }}>
-      <View style={{ height: 40 }} />
+      <View style={{ height: 120 }} />
       <View style={{ flexDirection: "row", alignItems: "center" }}>
         <View style={{ width: 25 }} />
 
@@ -238,10 +257,24 @@ const CreateScreen = () => {
         defaultButtonText={"횟수를 선택하세요"}
       />
 
+      <SelectDropdown
+        data={data2}
+        onSelect={(selectedItem, index) => {
+          setWeight(Number(selectedItem));
+        }}
+        buttonTextAfterSelection={(selectedItem, index) => {
+          return selectedItem;
+        }}
+        rowTextForSelection={(item, index) => {
+          return item;
+        }}
+        defaultButtonText={"무게를 선택하세요"}
+      />
+
       <Pressable
         disabled={!text.length}
         onPress={async () => {
-          await createEvent({ text, setCount, loopCount, date });
+          await createEvent({ text, setCount, loopCount, date, weight });
 
           setText("");
         }}
