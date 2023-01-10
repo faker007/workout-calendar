@@ -11,9 +11,10 @@ export default function AgendaItem({ item }) {
           style={[
             styles.itemText,
             {
-              textDecorationLine: !item?.isChecked?.length
-                ? undefined
-                : "line-through",
+              textDecorationLine:
+                item?.isChecked?.length !== item?.setCount
+                  ? undefined
+                  : "line-through",
             },
           ]}
         >
@@ -25,9 +26,10 @@ export default function AgendaItem({ item }) {
             style={[
               styles.itemText,
               {
-                textDecorationLine: !item?.isChecked?.length
-                  ? undefined
-                  : "line-through",
+                textDecorationLine:
+                  item?.isChecked?.length !== item?.setCount
+                    ? undefined
+                    : "line-through",
                 textAlign: "center",
               },
             ]}

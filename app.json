@@ -14,7 +14,9 @@
     "updates": {
       "fallbackToCacheTimeout": 0
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true
     },
@@ -23,14 +25,14 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
       },
-      "package": "com.superhaker337.greatcalendar"
+      "package": "com.superhaker337.workoutcalendar"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "extra": {
       "eas": {
-        "projectId": "dc23e8ae-6951-46de-b02a-3f5bd38d5b07"
+        "projectId": "526de223-98dc-4c3e-8d0e-fe1a72c8a3b3"
       }
     }
   }
